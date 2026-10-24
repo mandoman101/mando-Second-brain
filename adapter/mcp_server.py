@@ -136,6 +136,42 @@ def detect_active_conflicts() -> str:
     return json.dumps(res, indent=2)
 
 
+
+@mcp.tool()
+def graduate_memory(inbox_rel_path: str, target_folder: str = "Knowledge", reviewer_agent_id: str = "architect") -> str:
+    """Promote a verified Inbox/ note into canonical Knowledge/ (or Architecture/) and leave a non-destructive redirect stub."""
+    res = _adapter().graduate_memory(inbox_rel_path=inbox_rel_path, target_folder=target_folder, reviewer_agent_id=reviewer_agent_id)
+    return json.dumps(res, indent=2)
+
+
+@mcp.tool()
+def supersede_memory(old_rel_path: str, new_rel_path: str, reason: str = "Updated architectural decision", agent_id: str = "architect") -> str:
+    """Non-destructively mark old_rel_path as status: superseded and link it to new_rel_path."""
+    res = _adapter().supersede_memory(old_rel_path=old_rel_path, new_rel_path=new_rel_path, reason=reason, agent_id=agent_id)
+    return json.dumps(res, indent=2)
+
+
+@mcp.tool()
+def audit_memory_freshness(stale_days: int = 30) -> str:
+    """Audit vault notes for staleness, verification status, and superseded history."""
+    res = _adapter().audit_memory_freshness(stale_days=stale_days)
+    return json.dumps(res, indent=2)
+
+
+@mcp.tool()
+def rebuild_search_index(agent_id: str = "analyst") -> str:
+    """Build or refresh the local SQLite FTS5 + TF-IDF vector hybrid search index (.forgepoints/memory_index.sqlite3)."""
+    res = _adapter().rebuild_search_index(agent_id=agent_id)
+    return json.dumps(res, indent=2)
+
+
+@mcp.tool()
+def hybrid_search_memory(query: str, limit: int = 6, agent_id: str = "analyst") -> str:
+    """Query the local SQLite FTS5 + TF-IDF cosine hybrid search index with verification boost and superseded demotion."""
+    res = _adapter().hybrid_search_memory(query=query, limit=limit, agent_id=agent_id)
+    return json.dumps(res, indent=2)
+
+
 def main() -> None:
     mcp.run()
 
