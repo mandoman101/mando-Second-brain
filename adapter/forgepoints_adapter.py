@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""ForgePoints AI Lab — Clean-Room Integration Service (Milestone 1).
+"""ForgePoints AI Lab — Clean-Room Integration Service (Milestones 1 & 2).
 
 Bridges:
   1. Obsidian Second Brain (MIT) AI-First vault notes & MCP vault_ops
   2. Hypernovum (AGPL-3.0-only) 3D City project frontmatter & v2 agent heartbeats
   3. OpenClaw / ForgePoint live Apple Silicon cluster telemetry
+  4. Cross-Agent Shared Memory API (search_memory, read_memory, propose_memory,
+     get_project_context, record_task_outcome, get_system_health)
 
 No hardcoded IPs, credentials, or machine assignments; all settings load from
 config JSON or environment variables.
@@ -23,11 +25,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _SECRET_PATTERNS = [
     re.compile(r"sk-[A-Za-z0-9]{20,}"),
     re.compile(r"ghp_[A-Za-z0-9]{20,}"),
+    re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
     re.compile(r"AIza[0-9A-Za-z\-_]{30,}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"(?i)(?:api[_-]?key|secret[_-]?key|password|access[_-]?token)\s*[:=]\s*['\"]?[A-Za-z0-9_\-./+=]{12,}"),
@@ -45,6 +48,13 @@ _STATUS_TO_HYPERNOVUM = {
     "complete": "complete",
     "done": "complete",
     "archived": "complete",
+}
+
+_AGENT_ID_MAP = {
+    "architect": ("agent-architect-m3max", "Architect (mando-mbp M3 Max 64GB)", "claude"),
+    "analyst": ("agent-analyst-tybot", "Analyst (ty-bot M4 32GB)", "custom"),
+    "coder": ("agent-coder-mandobot", "Coder (mando-bot M4 Pro 24GB)", "codex"),
+    "main": ("agent-controller-milliegirl", "Controller (millie-girl M4 16GB)", "custom"),
 }
 
 
@@ -106,6 +116,54 @@ class ForgePointsAdapter:
         if top in {"raw", ".obsidian", ".git", "templates", "_trash", ".trash"}:
             raise PathTraversalError(f"Protected vault directory cannot be modified: {top}")
         return full
+
+    def emit_agent_activity(
+        self,
+        agent_id: str,
+        state: str,
+        action: str,
+        project_title: str = "ForgePoints AI Lab Collective Intelligence",
+        tool_name: str = "mcp",
+        file_path: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Emit a real-time Hypernovum v2 agent heartbeat when an agent uses a memory tool."""
+        hb_script = self.hn_path / "scripts" / "heartbeat.js"
+        if not hb_script.exists():
+            return None
+        sid, name, atype = _AGENT_ID_MAP.get(
+            agent_id,
+            (f"agent-{agent_id}", f"Agent ({agent_id})", "custom"),
+        )
+        # Resolve projectDir from config if available
+        proj_dir = str(self.vault_path.parent)
+        for p in self.config.get("projects", []):
+            if p.get("title", "").lower() == project_title.lower() or p.get("id", "").lower() == project_title.lower():
+                proj_dir = p.get("projectDir", proj_dir)
+                project_title = p.get("title", project_title)
+                break
+        cmd = [
+            "node",
+            str(hb_script),
+            f"--vault={self.vault_path}",
+            f"--id={sid}",
+            f"--name={name}",
+            f"--agent-type={atype}",
+            f"--cwd={proj_dir}",
+            f"--project={project_title}",
+            f"--state={state}",
+            f"--action={action}",
+            f"--tool={tool_name}",
+        ]
+        if file_path:
+            cmd.append(f"--file={file_path}")
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=5)
+            snap_file = self.vault_path / ".hypernovum" / "agents" / f"{sid}.json"
+            if snap_file.exists():
+                return json.loads(snap_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        return None
 
     # ------------------------------------------------------------------
     # 1. Dual-Schema Project Note Synthesizer (OSB AI-First + Hypernovum)
@@ -201,15 +259,17 @@ class ForgePointsAdapter:
         return written
 
     # ------------------------------------------------------------------
-    # 2. Cross-Agent Memory Operations (Search, Read, Propose, Deduplicate)
+    # 2. Cross-Agent Memory Operations (6 Required MCP Capabilities)
     # ------------------------------------------------------------------
-    def search_memory(self, query: str, limit: int = 6) -> List[Dict[str, Any]]:
+    def search_memory(self, query: str, limit: int = 6, agent_id: str = "analyst") -> List[Dict[str, Any]]:
         self._bind_vault_env()
+        self.emit_agent_activity(agent_id, "reading", f"Searching memory: {query[:40]}", tool_name="search_memory")
         return self.vault_ops.search(query, limit=limit)
 
-    def read_memory(self, rel_path: str) -> Dict[str, Any]:
+    def read_memory(self, rel_path: str, agent_id: str = "analyst") -> Dict[str, Any]:
         self._bind_vault_env()
         self._guard_vault_path(rel_path)
+        self.emit_agent_activity(agent_id, "reading", f"Reading {rel_path}", tool_name="read_memory", file_path=rel_path)
         return self.vault_ops.read_note(rel_path)
 
     def propose_memory(
@@ -222,7 +282,7 @@ class ForgePointsAdapter:
         project_link: str = "",
         confidence: str = "high",
         verification_status: str = "verified",
-        agent_id: str = "unknown-agent",
+        agent_id: str = "analyst",
     ) -> Dict[str, Any]:
         self._bind_vault_env()
         ensure_no_secrets(title)
@@ -259,11 +319,137 @@ class ForgePointsAdapter:
             res["path"] = res["saved"]
         res["content_hash"] = norm_hash
         res["duplicate"] = False
+        self.emit_agent_activity(
+            agent_id,
+            "editing",
+            f"Saved memory: {title[:36]}",
+            project_title=project_link or "ForgePoints AI Lab Collective Intelligence",
+            tool_name="propose_memory",
+            file_path=res.get("path"),
+        )
         return res
+
+    def get_project_context(self, project_name: str, agent_id: str = "architect") -> Dict[str, Any]:
+        """Retrieve full project dossier, frontmatter, open quests, and backlinked notes."""
+        self._bind_vault_env()
+        projects_dir = self.vault_path / "Projects"
+        matched_rel: Optional[str] = None
+        if projects_dir.is_dir():
+            for md in sorted(projects_dir.glob("*.md")):
+                if project_name.lower() in md.stem.lower():
+                    matched_rel = f"Projects/{md.name}"
+                    break
+        if not matched_rel:
+            return {"found": False, "error": f"Project '{project_name}' not found in Projects/"}
+
+        note = self.vault_ops.read_note(matched_rel)
+        bl = self.vault_ops.backlinks(Path(matched_rel).stem)
+        self.emit_agent_activity(
+            agent_id,
+            "planning",
+            f"Inspecting project context: {Path(matched_rel).stem}",
+            project_title=Path(matched_rel).stem,
+            tool_name="get_project_context",
+            file_path=matched_rel,
+        )
+        return {
+            "found": True,
+            "path": matched_rel,
+            "title": Path(matched_rel).stem,
+            "content": note.get("content", ""),
+            "backlinks": bl.get("backlinks", []),
+        }
+
+    def record_task_outcome(
+        self,
+        project_name: str,
+        task_summary: str,
+        outcome: str = "completed",
+        resolved_quest: Optional[str] = None,
+        agent_id: str = "coder",
+        files_changed: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Record a completed task outcome into the project note, increment tasks_done, and emit orb state."""
+        self._bind_vault_env()
+        ensure_no_secrets(task_summary)
+        ctx = self.get_project_context(project_name, agent_id=agent_id)
+        if not ctx.get("found"):
+            return ctx
+
+        rel_path = ctx["path"]
+        full_path = self._guard_vault_path(rel_path)
+        text = full_path.read_text(encoding="utf-8")
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Increment tasks_done in YAML frontmatter if present
+        m_done = re.search(r"(?m)^tasks_done:\s*(\d+)", text)
+        m_tot = re.search(r"(?m)^tasks:\s*(\d+)", text)
+        if m_done and outcome == "completed":
+            new_done = int(m_done.group(1)) + 1
+            text = re.sub(r"(?m)^tasks_done:\s*\d+", f"tasks_done: {new_done}", text, count=1)
+            if m_tot and new_done > int(m_tot.group(1)):
+                text = re.sub(r"(?m)^tasks:\s*\d+", f"tasks: {new_done}", text, count=1)
+
+        # Append task outcome entry under ## Recent Outcomes (or end of note)
+        files_str = f" (files: {', '.join(files_changed)})" if files_changed else ""
+        outcome_line = f"- [{'x' if outcome == 'completed' else ' '}] **{today}** (`{agent_id}` · `{outcome}`): {task_summary}{files_str} (as of {today}, confidence: stated)"
+        if "## Recent Outcomes" in text:
+            text = text.rstrip() + "\n" + outcome_line + "\n"
+        else:
+            text = text.rstrip() + "\n\n## Recent Outcomes\n" + outcome_line + "\n"
+
+        if resolved_quest:
+            ensure_no_secrets(resolved_quest)
+            text = text.replace(f"- [ ] Open Quest: {resolved_quest}", f"- [x] Resolved Quest: {resolved_quest} (as of {today})")
+
+        full_path.write_text(text, encoding="utf-8")
+        hb_state = "complete" if outcome == "completed" else ("blocked" if outcome == "blocked" else "running")
+        snap = self.emit_agent_activity(
+            agent_id,
+            hb_state,
+            f"{outcome.upper()}: {task_summary[:42]}",
+            project_title=ctx["title"],
+            tool_name="record_task_outcome",
+            file_path=rel_path,
+        )
+        return {
+            "ok": True,
+            "project": ctx["title"],
+            "path": rel_path,
+            "outcome": outcome,
+            "agent_id": agent_id,
+            "heartbeat": snap,
+        }
 
     def get_vault_health(self) -> Dict[str, Any]:
         self._bind_vault_env()
         return self.vault_ops.vault_health()
+
+    def get_system_health(self, agent_id: str = "main") -> Dict[str, Any]:
+        """Combined health check of the Second-Brain Vault, Cluster Telemetry, and Hypernovum Agent Fleet."""
+        self._bind_vault_env()
+        v_health = self.vault_ops.vault_health()
+        telemetry = self.fetch_live_cluster_telemetry()
+        agents_dir = self.vault_path / ".hypernovum" / "agents"
+        fleet = []
+        if agents_dir.is_dir():
+            for jf in sorted(agents_dir.glob("*.json")):
+                try:
+                    fleet.append(json.loads(jf.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+        return {
+            "status": "healthy",
+            "vaultPath": str(self.vault_path),
+            "vaultHealth": v_health,
+            "clusterSummary": {
+                "poolRamUsedGb": telemetry.get("poolRamUsed", 0.0),
+                "poolRamTotalGb": telemetry.get("poolRamTotal", 0.0),
+                "onlineNodes": [n["id"] for n in telemetry.get("nodes", []) if n.get("online")],
+            },
+            "hypernovumFleetCount": len(fleet),
+            "hypernovumFleet": fleet,
+        }
 
     # ------------------------------------------------------------------
     # 3. Live Cluster Telemetry -> Hypernovum Heartbeat v2 Bridge
@@ -359,8 +545,8 @@ def main() -> None:
         snaps = adapter.sync_cluster_heartbeats()
         print(f"Synced {len(snaps)} live cluster agent heartbeats into .hypernovum/agents/")
     if args.command in ("health", "sync-all"):
-        h = adapter.get_vault_health()
-        print("Vault health:", json.dumps(h, indent=2))
+        h = adapter.get_system_health()
+        print("System health:", json.dumps(h, indent=2))
 
 
 if __name__ == "__main__":
