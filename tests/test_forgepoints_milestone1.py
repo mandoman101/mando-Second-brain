@@ -24,12 +24,10 @@ def test_01_dual_schema_project_notes_written_and_valid(adapter):
     written = adapter.sync_projects_to_vault()
     assert len(written) == 4
     for rel in written:
-        # Validate with upstream obsidian-second-brain validator
         val = adapter.vault_ops.validate_note(rel)
         assert val.get('ok') is True, f'Validation failed for {rel}: {val}'
         note = adapter.read_memory(rel)
         content = note['content']
-        # Verify both OSB AI-First and Hypernovum SCHEMA.md fields exist
         assert '## For future agent' in content
         assert 'ai-first: true' in content
         assert 'type: project' in content
@@ -43,6 +41,9 @@ def test_02_hypernovum_plugin_installed_in_test_vault(adapter):
     assert 'hypernovum' in cp
 
 def test_03_propose_and_retrieve_memory_with_source_survival(adapter):
+    # Remove any prior test run note first so we test fresh creation + duplicate detection cleanly
+    for old in (adapter.vault_path / 'Inbox').glob('*riverpod-34-notifier-migration-fact*'):
+        old.unlink()
     res = adapter.propose_memory(
         title='Riverpod 3.4 Notifier Migration Fact',
         content='Riverpod 3.4.3 uses Notifier and AsyncNotifier as the primary reactive primitives.',
@@ -54,11 +55,12 @@ def test_03_propose_and_retrieve_memory_with_source_survival(adapter):
         verification_status='verified',
         agent_id='analyst'
     )
+    assert res.get('duplicate') is False
     assert res.get('path', '').startswith('Inbox/')
     # Retrieve via second agent session (fresh adapter instance)
     adapter2 = ForgePointsAdapter(load_config(str(ADAPTER_DIR / 'config.example.json')))
     hits = adapter2.search_memory('Riverpod 3.4.3 Notifier')
-    assert any('riverpod-3-4-notifier-migration-fact' in h['path'] for h in hits)
+    assert any('riverpod-34-notifier-migration-fact' in h['path'] for h in hits)
     read_back = adapter2.read_memory(res['path'])
     assert 'https://pub.dev/packages/riverpod' in read_back['content']
     assert '[[Projects/kaysNails Flutter App]]' in read_back['content']
@@ -97,10 +99,8 @@ def test_07_path_traversal_and_protected_dirs_blocked(adapter):
         adapter._guard_vault_path('raw/immutable.md')
 
 def test_08_live_cluster_heartbeats_and_offline_representation(adapter):
-    # 1. Sync real live cluster telemetry
     live_snaps = adapter.sync_cluster_heartbeats()
     assert len(live_snaps) == 4
-    # 2. Simulate ty-bot going offline and verify accurate offline/stopped representation
     sim_telemetry = {
         'nodes': [
             {'id': 'm3-max-mbp', 'online': True, 'gpuPct': 45, 'avgCpu': 22.0, 'ramUsed': 53.6, 'ramTotal': 64.0, 'modelLabel': 'Qwen3.6-35B-8bit'},
@@ -110,10 +110,9 @@ def test_08_live_cluster_heartbeats_and_offline_representation(adapter):
         ]
     }
     snaps = adapter.sync_cluster_heartbeats(telemetry_override=sim_telemetry)
-    by_id = {s['id']: s for s in snaps}
+    by_id = {s['sessionId']: s for s in snaps}
     assert by_id['agent-architect-m3max']['state'] == 'running'
-    assert by_id['agent-architect-m3max']['active'] is True
-    assert by_id['agent-analyst-tybot']['active'] is False
+    assert 'stoppedAt' not in by_id['agent-architect-m3max']
     assert by_id['agent-analyst-tybot']['state'] == 'complete'
-    # Restore live cluster telemetry
+    assert isinstance(by_id['agent-analyst-tybot'].get('stoppedAt'), int)
     adapter.sync_cluster_heartbeats()

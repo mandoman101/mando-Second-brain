@@ -255,6 +255,8 @@ class ForgePointsAdapter:
         tag_list = list(tags or [note_type, "forgepoints"])
         summary = f"{note_type.capitalize()} note '{title}' recorded by {agent_id} on {today} (verification: {verification_status}, confidence: {confidence})."
         res = self.vault_ops.save_note(title, enriched_body, note_type=note_type, tags=tag_list, summary=summary)
+        if "saved" in res and "path" not in res:
+            res["path"] = res["saved"]
         res["content_hash"] = norm_hash
         res["duplicate"] = False
         return res
