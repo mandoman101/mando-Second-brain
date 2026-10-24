@@ -425,6 +425,115 @@ class ForgePointsAdapter:
         self._bind_vault_env()
         return self.vault_ops.vault_health()
 
+    # ------------------------------------------------------------------
+    # 4. Phase 5: Conflict Detection & File Lock Guard (AGT-007 Parity)
+    # ------------------------------------------------------------------
+    def detect_active_conflicts(self, active_window_ms: int = 600000) -> List[Dict[str, Any]]:
+        """Detect deterministic same-file and same-project conflicts across active .hypernovum/agents/*.json sessions."""
+        agents_dir = self.vault_path / ".hypernovum" / "agents"
+        if not agents_dir.is_dir():
+            return []
+        now_ms = int(datetime.now().timestamp() * 1000)
+        working_states = {"starting", "planning", "reading", "editing", "running", "testing", "reviewing", "waiting", "blocked"}
+        sessions: List[Dict[str, Any]] = []
+        for jf in sorted(agents_dir.glob("*.json")):
+            try:
+                s = json.loads(jf.read_text(encoding="utf-8"))
+                if s.get("stoppedAt"):  # stopped sessions are not actively conflicting
+                    continue
+                if now_ms - int(s.get("lastPing", 0)) > active_window_ms:
+                    continue
+                if s.get("state") in working_states:
+                    sessions.append(s)
+            except Exception:
+                pass
+
+        conflicts: List[Dict[str, Any]] = []
+        for i in range(len(sessions)):
+            for j in range(i + 1, len(sessions)):
+                a, b = sessions[i], sessions[j]
+                proj_a = (a.get("project") or "").strip()
+                proj_b = (b.get("project") or "").strip()
+                if not proj_a or proj_a.lower() != proj_b.lower():
+                    continue
+                pair = sorted([a.get("sessionId", "a"), b.get("sessionId", "b")])
+                file_a = (a.get("file") or "").strip().lstrip("./")
+                file_b = (b.get("file") or "").strip().lstrip("./")
+                if file_a and file_a == file_b:
+                    conflicts.append({
+                        "key": f"same-file|{pair[0]}|{pair[1]}|{file_a}",
+                        "kind": "same-file",
+                        "severity": "high",
+                        "sessions": pair,
+                        "project": proj_a,
+                        "files": [file_a],
+                        "message": f"{a.get('name', pair[0])} and {b.get('name', pair[1])} are both touching '{file_a}' in '{proj_a}'",
+                    })
+                elif a.get("state") == "editing" and b.get("state") == "editing":
+                    conflicts.append({
+                        "key": f"same-project|{pair[0]}|{pair[1]}|{proj_a}",
+                        "kind": "same-project",
+                        "severity": "medium",
+                        "sessions": pair,
+                        "project": proj_a,
+                        "files": [f for f in (file_a, file_b) if f],
+                        "message": f"{a.get('name', pair[0])} and {b.get('name', pair[1])} are concurrently editing in project '{proj_a}'",
+                    })
+        return conflicts
+
+    def claim_file_scope(
+        self,
+        agent_id: str,
+        project_name: str,
+        file_path: str,
+        action: str = "Editing file",
+    ) -> Dict[str, Any]:
+        """Claim a file write-scope for an agent, rejecting with a conflict warning if another active agent already owns that file."""
+        ensure_no_secrets(file_path)
+        norm_target = file_path.strip().lstrip("./")
+        sid, _, _ = _AGENT_ID_MAP.get(agent_id, (f"agent-{agent_id}", agent_id, "custom"))
+
+        # Check if any OTHER active session is currently editing this exact file in this project
+        agents_dir = self.vault_path / ".hypernovum" / "agents"
+        if agents_dir.is_dir():
+            for jf in sorted(agents_dir.glob("*.json")):
+                try:
+                    s = json.loads(jf.read_text(encoding="utf-8"))
+                    other_sid = s.get("sessionId")
+                    if other_sid == sid or s.get("stoppedAt"):
+                        continue
+                    other_proj = (s.get("project") or "").lower()
+                    other_file = (s.get("file") or "").strip().lstrip("./")
+                    if project_name.lower() in other_proj and other_file == norm_target and s.get("state") in {"editing", "running"}:
+                        return {
+                            "acquired": False,
+                            "conflict": True,
+                            "holderSessionId": other_sid,
+                            "holderName": s.get("name"),
+                            "file": norm_target,
+                            "project": s.get("project"),
+                            "message": f"Single-Writer Lock denied: {s.get('name')} ({other_sid}) is already editing '{norm_target}' in '{s.get('project')}'.",
+                        }
+                except Exception:
+                    pass
+
+        snap = self.emit_agent_activity(
+            agent_id=agent_id,
+            state="editing",
+            action=f"{action}: {norm_target}",
+            project_title=project_name,
+            tool_name="claim_file_scope",
+            file_path=norm_target,
+        )
+        return {
+            "acquired": True,
+            "conflict": False,
+            "sessionId": sid,
+            "file": norm_target,
+            "project": project_name,
+            "heartbeat": snap,
+        }
+
     def get_system_health(self, agent_id: str = "main") -> Dict[str, Any]:
         """Combined health check of the Second-Brain Vault, Cluster Telemetry, and Hypernovum Agent Fleet."""
         self._bind_vault_env()
@@ -449,6 +558,7 @@ class ForgePointsAdapter:
             },
             "hypernovumFleetCount": len(fleet),
             "hypernovumFleet": fleet,
+            "activeConflicts": self.detect_active_conflicts(),
         }
 
     # ------------------------------------------------------------------

@@ -121,6 +121,21 @@ def get_system_health(agent_id: str = "main") -> str:
     return json.dumps(res, indent=2)
 
 
+
+@mcp.tool()
+def claim_file_scope(agent_id: str, project_name: str, file_path: str, action: str = "Editing file") -> str:
+    """Claim single-writer lock on a file in a project before editing; emits an editing orb heartbeat or returns a conflict refusal."""
+    res = _adapter().claim_file_scope(agent_id=agent_id, project_name=project_name, file_path=file_path, action=action)
+    return json.dumps(res, indent=2)
+
+
+@mcp.tool()
+def detect_active_conflicts() -> str:
+    """Check all active .hypernovum/agents/*.json sessions for same-file or same-project editing conflicts (AGT-007)."""
+    res = _adapter().detect_active_conflicts()
+    return json.dumps(res, indent=2)
+
+
 def main() -> None:
     mcp.run()
 
