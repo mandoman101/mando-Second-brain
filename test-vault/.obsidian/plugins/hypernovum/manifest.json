@@ -1,0 +1,10 @@
+{
+  "id": "hypernovum",
+  "name": "Hypernovum",
+  "version": "0.7.0",
+  "minAppVersion": "1.6.0",
+  "description": "Visualize your vault as a 3D city, launch AI coding agents with full context, and track Git activity live.",
+  "author": "Randall Morgan",
+  "authorUrl": "https://github.com/pardesco",
+  "isDesktopOnly": true
+}

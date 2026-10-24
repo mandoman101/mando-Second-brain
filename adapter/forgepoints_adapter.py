@@ -1,0 +1,365 @@
+#!/usr/bin/env python3
+"""ForgePoints AI Lab — Clean-Room Integration Service (Milestone 1).
+
+Bridges:
+  1. Obsidian Second Brain (MIT) AI-First vault notes & MCP vault_ops
+  2. Hypernovum (AGPL-3.0-only) 3D City project frontmatter & v2 agent heartbeats
+  3. OpenClaw / ForgePoint live Apple Silicon cluster telemetry
+
+No hardcoded IPs, credentials, or machine assignments; all settings load from
+config JSON or environment variables.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.request
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+SCHEMA_VERSION = 1
+
+_SECRET_PATTERNS = [
+    re.compile(r"sk-[A-Za-z0-9]{20,}"),
+    re.compile(r"ghp_[A-Za-z0-9]{20,}"),
+    re.compile(r"AIza[0-9A-Za-z\-_]{30,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    re.compile(r"(?i)(?:api[_-]?key|secret[_-]?key|password|access[_-]?token)\s*[:=]\s*['\"]?[A-Za-z0-9_\-./+=]{12,}"),
+]
+
+_STATUS_TO_HYPERNOVUM = {
+    "active": "active",
+    "in-progress": "active",
+    "planning": "active",
+    "blocked": "blocked",
+    "stalled": "blocked",
+    "paused": "paused",
+    "on-hold": "paused",
+    "completed": "complete",
+    "complete": "complete",
+    "done": "complete",
+    "archived": "complete",
+}
+
+
+class SecretLeakError(ValueError):
+    """Raised when a proposed memory or observation contains credentials/secrets."""
+
+
+class PathTraversalError(ValueError):
+    """Raised when a path escapes the vault root or targets a protected directory."""
+
+
+def ensure_no_secrets(text: str) -> None:
+    """Verify that text contains no API keys, tokens, passwords, or private keys."""
+    for pat in _SECRET_PATTERNS:
+        if pat.search(text or ""):
+            raise SecretLeakError("Refusing to store content matching secret/credential pattern.")
+
+
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    path = config_path or os.environ.get("FORGEPOINTS_CONFIG") or str(
+        Path(__file__).resolve().parent / "config.example.json"
+    )
+    cfg = json.loads(Path(path).read_text(encoding="utf-8"))
+    if os.environ.get("OBSIDIAN_VAULT_PATH"):
+        cfg["vaultPath"] = os.environ["OBSIDIAN_VAULT_PATH"]
+    if os.environ.get("FORGEPOINTS_TELEMETRY_URL"):
+        cfg["telemetryUrl"] = os.environ["FORGEPOINTS_TELEMETRY_URL"]
+    return cfg
+
+
+class ForgePointsAdapter:
+    """Clean-room adapter connecting Obsidian Second Brain, Hypernovum, and OpenClaw."""
+
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.vault_path = Path(config["vaultPath"]).resolve()
+        self.osb_path = Path(config["upstreamSecondBrainPath"]).resolve()
+        self.hn_path = Path(config["upstreamHypernovumPath"]).resolve()
+        os.environ["OBSIDIAN_VAULT_PATH"] = str(self.vault_path)
+        self._load_upstream_vault_ops()
+
+    def _bind_vault_env(self) -> None:
+        os.environ["OBSIDIAN_VAULT_PATH"] = str(self.vault_path)
+
+    def _load_upstream_vault_ops(self) -> None:
+        mcp_dir = str(self.osb_path / "integrations" / "obsidian-mcp-server")
+        if mcp_dir not in sys.path:
+            sys.path.insert(0, mcp_dir)
+        import vault_ops  # type: ignore
+        self.vault_ops = vault_ops
+
+    def _guard_vault_path(self, rel_path: str) -> Path:
+        if not rel_path or rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            raise PathTraversalError(f"Invalid vault-relative path: {rel_path}")
+        full = (self.vault_path / rel_path).resolve()
+        if not str(full).startswith(str(self.vault_path)):
+            raise PathTraversalError(f"Path escapes vault root: {rel_path}")
+        top = Path(rel_path).parts[0].lower() if Path(rel_path).parts else ""
+        if top in {"raw", ".obsidian", ".git", "templates", "_trash", ".trash"}:
+            raise PathTraversalError(f"Protected vault directory cannot be modified: {top}")
+        return full
+
+    # ------------------------------------------------------------------
+    # 1. Dual-Schema Project Note Synthesizer (OSB AI-First + Hypernovum)
+    # ------------------------------------------------------------------
+    def render_dual_schema_project_note(self, proj: Dict[str, Any]) -> str:
+        today = datetime.now().strftime("%Y-%m-%d")
+        title = proj["title"]
+        ensure_no_secrets(json.dumps(proj))
+
+        raw_status = proj.get("status", "active")
+        hn_status = _STATUS_TO_HYPERNOVUM.get(raw_status, "active")
+        stage = proj.get("stage") or ("backlog" if raw_status == "planning" else hn_status)
+        priority = proj.get("priority", "medium")
+        category = proj.get("category", "ai-infrastructure")
+        project_dir = proj.get("projectDir", "")
+        stack = proj.get("stack", [])
+        tasks_total = int(proj.get("tasks", 0))
+        tasks_done = int(proj.get("tasks_done", 0))
+        questions = proj.get("questions", [])
+        answered = proj.get("answered", [])
+        depends_on = proj.get("depends_on", [])
+        summary = proj.get("summary", f"{title} project in ForgePoints AI Lab.")
+
+        lines = [
+            "---",
+            f"date: {today}",
+            f"updated: {today}",
+            "type: project",
+            f"title: {title}",
+            f"status: {hn_status}",
+            f"priority: {priority}",
+            f"stage: {stage}",
+            f"category: {category}",
+            f"tags: [project, {category}, forgepoints]",
+            "ai-first: true",
+            "verification_status: verified",
+            "confidence: high",
+            f"repo: {project_dir}",
+            f"projectDir: {project_dir}",
+            f"tasks: {tasks_total}",
+            f"tasks_done: {tasks_done}",
+            f"stack: {json.dumps(stack)}",
+        ]
+        if depends_on:
+            lines.append(f"related-projects: {json.dumps(depends_on)}")
+            lines.append(f"depends_on: {json.dumps(depends_on)}")
+            lines.append("relations:")
+            lines.append(f"  depends_on: {json.dumps(depends_on)}")
+        if questions:
+            lines.append(f"questions: {json.dumps(questions)}")
+        if answered:
+            lines.append(f"answered: {json.dumps(answered)}")
+        lines.append("---")
+        lines.append("")
+        lines.append("## For future agent")
+        lines.append(
+            f"{title} is an active ForgePoints AI Lab project in the `{category}` district with status `{hn_status}` as of {today}. "
+            f"{summary} Primary code path: `{project_dir}`."
+        )
+        lines.append("")
+        lines.append("## Overview")
+        lines.append(summary)
+        lines.append("")
+        lines.append("## Architecture & Stack")
+        for item in stack:
+            lines.append(f"- **{item}**")
+        if depends_on:
+            lines.append("")
+            lines.append("## Dependencies")
+            for dep in depends_on:
+                lines.append(f"- Depends on {dep}")
+        lines.append("")
+        lines.append("## Key Decisions")
+        for ans in answered:
+            lines.append(f"- [x] {ans} (as of {today}, confidence: stated)")
+        for q in questions:
+            lines.append(f"- [ ] Open Quest: {q}")
+        lines.append("")
+        return "\n".join(lines)
+
+    def sync_projects_to_vault(self) -> List[str]:
+        self._bind_vault_env()
+        projects_dir = self.vault_path / "Projects"
+        projects_dir.mkdir(parents=True, exist_ok=True)
+        written: List[str] = []
+        for proj in self.config.get("projects", []):
+            title = proj["title"]
+            rel = f"Projects/{title}.md"
+            target = self._guard_vault_path(rel)
+            content = self.render_dual_schema_project_note(proj)
+            target.write_text(content, encoding="utf-8")
+            written.append(rel)
+        return written
+
+    # ------------------------------------------------------------------
+    # 2. Cross-Agent Memory Operations (Search, Read, Propose, Deduplicate)
+    # ------------------------------------------------------------------
+    def search_memory(self, query: str, limit: int = 6) -> List[Dict[str, Any]]:
+        self._bind_vault_env()
+        return self.vault_ops.search(query, limit=limit)
+
+    def read_memory(self, rel_path: str) -> Dict[str, Any]:
+        self._bind_vault_env()
+        self._guard_vault_path(rel_path)
+        return self.vault_ops.read_note(rel_path)
+
+    def propose_memory(
+        self,
+        title: str,
+        content: str,
+        note_type: str = "research",
+        tags: Optional[List[str]] = None,
+        source_ref: str = "",
+        project_link: str = "",
+        confidence: str = "high",
+        verification_status: str = "verified",
+        agent_id: str = "unknown-agent",
+    ) -> Dict[str, Any]:
+        self._bind_vault_env()
+        ensure_no_secrets(title)
+        ensure_no_secrets(content)
+        ensure_no_secrets(source_ref)
+        if not agent_id or agent_id == "unauthorized":
+            raise PermissionError("Unauthorized agent_id cannot write to vault memory.")
+
+        norm_hash = hashlib.sha256(f"{title.strip().lower()}::{content.strip()}".encode("utf-8")).hexdigest()[:16]
+        inbox_dir = self.vault_path / "Inbox"
+        inbox_dir.mkdir(parents=True, exist_ok=True)
+        for existing in inbox_dir.glob("*.md"):
+            txt = existing.read_text(encoding="utf-8", errors="ignore")
+            if f"content_hash: {norm_hash}" in txt:
+                return {
+                    "saved": False,
+                    "duplicate": True,
+                    "path": str(existing.relative_to(self.vault_path)),
+                    "content_hash": norm_hash,
+                }
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        enriched_body = content.strip()
+        if source_ref:
+            enriched_body += f"\n\n## Sources\n- Source Reference: {source_ref} (as of {today}, confidence: {confidence})"
+        if project_link:
+            enriched_body += f"\n- Related Project: [[Projects/{project_link}]]"
+        enriched_body += f"\n- Recorded by Agent: `{agent_id}` | Verification: `{verification_status}` | content_hash: {norm_hash}\n"
+
+        tag_list = list(tags or [note_type, "forgepoints"])
+        summary = f"{note_type.capitalize()} note '{title}' recorded by {agent_id} on {today} (verification: {verification_status}, confidence: {confidence})."
+        res = self.vault_ops.save_note(title, enriched_body, note_type=note_type, tags=tag_list, summary=summary)
+        res["content_hash"] = norm_hash
+        res["duplicate"] = False
+        return res
+
+    def get_vault_health(self) -> Dict[str, Any]:
+        self._bind_vault_env()
+        return self.vault_ops.vault_health()
+
+    # ------------------------------------------------------------------
+    # 3. Live Cluster Telemetry -> Hypernovum Heartbeat v2 Bridge
+    # ------------------------------------------------------------------
+    def fetch_live_cluster_telemetry(self) -> Dict[str, Any]:
+        url = self.config.get("telemetryUrl", "http://127.0.0.1:18795/api/metrics")
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            raw = urllib.request.urlopen(req, timeout=2.5).read().decode("utf-8")
+            return json.loads(raw)
+        except Exception as e:
+            return {"nodes": [], "error": str(e)}
+
+    def sync_cluster_heartbeats(self, telemetry_override: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        telemetry = telemetry_override if telemetry_override is not None else self.fetch_live_cluster_telemetry()
+        nodes_by_id = {n["id"]: n for n in telemetry.get("nodes", []) if "id" in n}
+        hb_script = self.hn_path / "scripts" / "heartbeat.js"
+        emitted: List[Dict[str, Any]] = []
+
+        for mapping in self.config.get("agentNodeMappings", []):
+            nid = mapping["nodeId"]
+            sid = mapping["sessionId"]
+            node_state = nodes_by_id.get(nid)
+            if not node_state or not node_state.get("online", False):
+                state = "failed"
+                action = f"Node {nid} offline / unreachable"
+                stop_flag = True
+            else:
+                gpu = int(node_state.get("gpuPct", 0))
+                cpu = float(node_state.get("avgCpu", 0.0))
+                ram_used = node_state.get("ramUsed", 0.0)
+                ram_tot = node_state.get("ramTotal", 0.0)
+                model_lbl = node_state.get("modelLabel", "oMLX")
+                if gpu >= 15 or cpu >= 20.0:
+                    state = "running"
+                else:
+                    state = "reading"
+                action = f"{model_lbl} | RAM {ram_used}/{ram_tot}GB | GPU {gpu}% | CPU {cpu}%"
+                stop_flag = False
+
+            cmd = [
+                "node",
+                str(hb_script),
+                f"--vault={self.vault_path}",
+                f"--id={sid}",
+                f"--name={mapping['agentName']}",
+                f"--agent-type={mapping.get('agentType', 'custom')}",
+                f"--cwd={mapping['targetProjectDir']}",
+                f"--project={mapping['targetProjectTitle']}",
+                f"--state={state}",
+                f"--action={action}",
+            ]
+            if stop_flag:
+                cmd.append("--stop")
+            subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=5)
+            snap_file = self.vault_path / ".hypernovum" / "agents" / f"{sid}.json"
+            if snap_file.exists():
+                emitted.append(json.loads(snap_file.read_text(encoding="utf-8")))
+        return emitted
+
+    def install_hypernovum_plugin_into_vault(self) -> Dict[str, Any]:
+        plugin_src = self.hn_path / "packages" / "obsidian-plugin"
+        plugin_dst = self.vault_path / ".obsidian" / "plugins" / "hypernovum"
+        plugin_dst.mkdir(parents=True, exist_ok=True)
+        copied = []
+        for fname in ("main.js", "manifest.json", "styles.css"):
+            src_f = plugin_src / fname
+            if src_f.exists():
+                dst_f = plugin_dst / fname
+                dst_f.write_bytes(src_f.read_bytes())
+                copied.append(fname)
+        cp_file = self.vault_path / ".obsidian" / "community-plugins.json"
+        cp_file.write_text(json.dumps(["hypernovum"], indent=2) + "\n", encoding="utf-8")
+        return {"pluginDir": str(plugin_dst), "files": copied}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="ForgePoints AI Lab Integration Service")
+    parser.add_argument("--config", default=None, help="Path to config JSON")
+    parser.add_argument("command", choices=["sync-projects", "sync-heartbeats", "install-plugin", "sync-all", "health"])
+    args = parser.parse_args()
+
+    cfg = load_config(args.config)
+    adapter = ForgePointsAdapter(cfg)
+
+    if args.command in ("install-plugin", "sync-all"):
+        p_res = adapter.install_hypernovum_plugin_into_vault()
+        print("Installed Hypernovum plugin into test-vault:", json.dumps(p_res))
+    if args.command in ("sync-projects", "sync-all"):
+        written = adapter.sync_projects_to_vault()
+        print("Synced dual-schema project notes:", json.dumps(written))
+    if args.command in ("sync-heartbeats", "sync-all"):
+        snaps = adapter.sync_cluster_heartbeats()
+        print(f"Synced {len(snaps)} live cluster agent heartbeats into .hypernovum/agents/")
+    if args.command in ("health", "sync-all"):
+        h = adapter.get_vault_health()
+        print("Vault health:", json.dumps(h, indent=2))
+
+
+if __name__ == "__main__":
+    main()

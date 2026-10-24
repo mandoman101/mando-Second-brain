@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "vaultPath": "/Users/millie-girl/development/forgepoints-ai-lab/test-vault",
+  "upstreamSecondBrainPath": "/Users/millie-girl/development/forgepoints-ai-lab/upstream/obsidian-second-brain",
+  "upstreamHypernovumPath": "/Users/millie-girl/development/forgepoints-ai-lab/upstream/hypernovum",
+  "telemetryUrl": "http://127.0.0.1:18795/api/metrics",
+  "projects": [
+    {
+      "id": "forgepoint-ai-memory-monitor",
+      "title": "ForgePoint AI Memory Monitor",
+      "status": "active",
+      "priority": "critical",
+      "stage": "active",
+      "category": "ai-infrastructure",
+      "projectDir": "/Users/millie-girl/development/macOS App/forge Point AI memory monitor",
+      "stack": [
+        "Swift",
+        "WebKit",
+        "Python",
+        "Apple Silicon Metal"
+      ],
+      "tasks": 12,
+      "tasks_done": 12,
+      "questions": [
+        "Should we add a 3D neural core desktop widget mode in Phase 6?"
+      ],
+      "answered": [
+        "Resolved duplicate M3 Max widget window bug via reconcileWidgets()"
+      ],
+      "depends_on": [],
+      "summary": "Native macOS desktop widget suite and telemetry engine for monitoring unified memory, Metal GPU utilization, per-core CPU load, and network throughput across the MANDO-MAN Software cluster."
+    },
+    {
+      "id": "forgepoints-collective-intelligence",
+      "title": "ForgePoints AI Lab Collective Intelligence",
+      "status": "active",
+      "priority": "critical",
+      "stage": "active",
+      "category": "ai-infrastructure",
+      "projectDir": "/Users/millie-girl/development/forgepoints-ai-lab",
+      "stack": [
+        "Obsidian Second Brain",
+        "Hypernovum",
+        "Three.js",
+        "Python",
+        "OpenClaw"
+      ],
+      "tasks": 16,
+      "tasks_done": 6,
+      "questions": [
+        "How should Phase 4 expose propose_memory approval gates to OpenClaw sub-agents?",
+        "When should SQLite FTS5 indexing replace linear vault scan?"
+      ],
+      "answered": [
+        "Verified dual-schema YAML compatibility between OSB ai-first-rules and Hypernovum SCHEMA.md"
+      ],
+      "depends_on": [
+        "[[Projects/ForgePoint AI Memory Monitor]]"
+      ],
+      "summary": "Persistent multi-agent Second Brain and 3D interactive code-city command center integrating obsidian-second-brain (MIT) and Hypernovum (AGPL-3.0) with OpenClaw."
+    },
+    {
+      "id": "kays-nails-flutter",
+      "title": "kaysNails Flutter App",
+      "status": "active",
+      "priority": "high",
+      "stage": "active",
+      "category": "mobile-apps",
+      "projectDir": "/Users/mandoman/Development/AndroidStudioProjects/kaysNails",
+      "stack": [
+        "Flutter",
+        "Dart",
+        "Android Studio",
+        "Riverpod"
+      ],
+      "tasks": 20,
+      "tasks_done": 14,
+      "questions": [
+        "Verify Riverpod 3.4.3 migration patterns via dart-flutter-mcp"
+      ],
+      "answered": [],
+      "depends_on": [
+        "[[Projects/ForgePoints AI Lab Collective Intelligence]]"
+      ],
+      "summary": "Android/Flutter mobile application developed on mando-mbp (10.10.10.158) and orchestrated via android-studio-mcp and dart-flutter-mcp."
+    },
+    {
+      "id": "creality-klipper-iot",
+      "title": "Creality 3D Printer Klipper Node",
+      "status": "paused",
+      "priority": "low",
+      "stage": "backlog",
+      "category": "hardware-iot",
+      "projectDir": "/Users/millie-girl/.openclaw/workspace",
+      "stack": [
+        "Raspberry Pi",
+        "BigTreeTech",
+        "Klipper",
+        "Moonraker"
+      ],
+      "tasks": 5,
+      "tasks_done": 1,
+      "questions": [
+        "Replace broken Raspberry Pi camera module before network bring-up"
+      ],
+      "answered": [],
+      "depends_on": [],
+      "summary": "Modified Creality 3D printer with BigTreeTech controller board and Raspberry Pi edge node awaiting camera hardware replacement."
+    }
+  ],
+  "agentNodeMappings": [
+    {
+      "nodeId": "m3-max-mbp",
+      "sessionId": "agent-architect-m3max",
+      "agentName": "Architect (mando-mbp M3 Max 64GB)",
+      "agentType": "claude",
+      "targetProjectTitle": "ForgePoints AI Lab Collective Intelligence",
+      "targetProjectDir": "/Users/millie-girl/development/forgepoints-ai-lab",
+      "role": "Lead Architect & Code Reviewer"
+    },
+    {
+      "nodeId": "ty-bot",
+      "sessionId": "agent-analyst-tybot",
+      "agentName": "Analyst (ty-bot M4 32GB)",
+      "agentType": "custom",
+      "targetProjectTitle": "ForgePoints AI Lab Collective Intelligence",
+      "targetProjectDir": "/Users/millie-girl/development/forgepoints-ai-lab",
+      "role": "Live API Researcher & Deep Repo Analyst"
+    },
+    {
+      "nodeId": "mando-bot",
+      "sessionId": "agent-coder-mandobot",
+      "agentName": "Coder (mando-bot M4 Pro 24GB)",
+      "agentType": "codex",
+      "targetProjectTitle": "ForgePoint AI Memory Monitor",
+      "targetProjectDir": "/Users/millie-girl/development/macOS App/forge Point AI memory monitor",
+      "role": "High-Speed Code Sprinter (74 tok/s)"
+    },
+    {
+      "nodeId": "millie-girl",
+      "sessionId": "agent-controller-milliegirl",
+      "agentName": "Controller (millie-girl M4 16GB)",
+      "agentType": "custom",
+      "targetProjectTitle": "ForgePoint AI Memory Monitor",
+      "targetProjectDir": "/Users/millie-girl/development/macOS App/forge Point AI memory monitor",
+      "role": "OpenClaw Gateway & Second-Brain Vault Host"
+    }
+  ]
+}

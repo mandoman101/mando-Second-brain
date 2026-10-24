@@ -1,0 +1,1652 @@
+/* Hypernovum - 3D Code City Dashboard */
+
+.hypernovum-container {
+  position: relative;
+  container-type: inline-size;
+  container-name: hypernovum;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0a0a14;
+  /* Obsidian's view-content carries theme padding — it insets the canvas and
+     desyncs the CSS2D overlay (labels/tooltips) from the WebGL render */
+  padding: 0;
+}
+
+.hypernovum-container canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hypernovum-label-renderer {
+  position: absolute;
+  top: 0;
+  pointer-events: none;
+}
+
+.hypernovum-container.hypernovum-cursor-pointer { cursor: pointer; }
+.hypernovum-container.hypernovum-cursor-grab { cursor: grab; }
+.hypernovum-container.hypernovum-cursor-grabbing { cursor: grabbing; }
+.hypernovum-container.hypernovum-cursor-move { cursor: move; }
+
+/* Category block labels */
+.hypernovum-category-label {
+  color: var(--hypernovum-category-color);
+  font-size: 11px;
+  font-family: var(--font-monospace, monospace);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 4px 10px;
+  background: rgba(10, 10, 18, 0.85);
+  border-radius: 3px;
+  text-shadow: 0 0 8px currentColor;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Building name labels */
+.hypernovum-building-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-family: var(--font-interface);
+  font-weight: 500;
+  padding: 2px 6px;
+  background: rgba(15, 15, 25, 0.8);
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 180ms ease;
+}
+
+/* Focus mode: labels of unrelated buildings fade with their buildings */
+.hypernovum-building-label.hv-label-dimmed {
+  opacity: 0.12;
+}
+
+/* Hover tooltip — panel hangs off a 0×0 anchor and extends AWAY from the
+   building (left/right set inline), so it never covers the hovered mesh */
+.hypernovum-tooltip-anchor {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.hypernovum-tooltip {
+  color: var(--text-normal, #e0e0e0);
+  font-size: 12px;
+  font-family: var(--font-interface);
+  background: linear-gradient(135deg, rgba(20, 20, 30, 0.95), rgba(15, 15, 25, 0.95));
+  border: 1px solid rgba(100, 100, 140, 0.3);
+  padding: 10px 14px;
+  border-radius: 8px;
+  pointer-events: none;
+  user-select: none;
+  min-width: 160px;
+  width: max-content;
+  max-width: 280px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+.hypernovum-tooltip-anchor .hypernovum-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateY(-50%);
+}
+
+.hypernovum-tooltip-anchor .hypernovum-tooltip-right { left: 10px; }
+.hypernovum-tooltip-anchor .hypernovum-tooltip-left { right: 10px; }
+
+.hypernovum-tooltip .tooltip-stack-none {
+  color: rgba(200, 210, 235, 0.5);
+  font-style: italic;
+}
+
+.hypernovum-tooltip .tooltip-stack-solo {
+  border-top: none;
+  margin-top: 2px;
+  padding-top: 0;
+}
+
+.hypernovum-tooltip strong {
+  display: block;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  border-bottom: 1px solid rgba(100, 100, 140, 0.2);
+}
+
+.hypernovum-tooltip .tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0;
+  font-size: 11px;
+}
+
+.hypernovum-tooltip .tooltip-row span:first-child {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.hypernovum-tooltip .status-active { color: #00cc66; }
+.hypernovum-tooltip .status-blocked { color: #cc3333; }
+.hypernovum-tooltip .status-paused { color: #3366cc; }
+.hypernovum-tooltip .status-complete { color: #9966cc; }
+
+/* Agent-orb identity tooltip (AGT-004) — distinct from the building tooltip */
+.hypernovum-agent-tooltip {
+  border-color: rgba(120, 200, 255, 0.45);
+}
+.hypernovum-tooltip .tooltip-agent-kicker {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: rgba(120, 200, 255, 0.9);
+  margin-bottom: 3px;
+}
+/* Agent state chips (base neutral; per-state colors from AGT-005) */
+.hypernovum-tooltip .agent-state {
+  text-transform: capitalize;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+.hypernovum-tooltip .agent-state-editing,
+.hypernovum-tooltip .agent-state-running,
+.hypernovum-tooltip .agent-state-reading,
+.hypernovum-tooltip .agent-state-testing,
+.hypernovum-tooltip .agent-state-reviewing,
+.hypernovum-tooltip .agent-state-planning,
+.hypernovum-tooltip .agent-state-starting { color: #6cd0ff; }
+.hypernovum-tooltip .agent-state-waiting { color: #ffbb44; }
+.hypernovum-tooltip .agent-state-blocked,
+.hypernovum-tooltip .agent-state-failed { color: #ff5555; }
+.hypernovum-tooltip .agent-state-complete { color: #4ade80; }
+.hypernovum-tooltip .agent-state-stale { color: #8a8a8a; }
+
+.hypernovum-tooltip .tooltip-enriched-section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(100, 140, 180, 0.2);
+}
+
+.hypernovum-tooltip .tooltip-enriched {
+  color: rgba(190, 220, 255, 0.86);
+}
+
+.hypernovum-tooltip .tooltip-memory {
+  color: #66e0a3;
+  font-weight: 600;
+}
+
+/* Tooltip tech stack section */
+.hypernovum-tooltip .tooltip-stack-section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(100, 140, 180, 0.2);
+}
+
+.hypernovum-tooltip .tooltip-stack-header {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: rgba(150, 170, 220, 0.8);
+  margin-bottom: 5px;
+}
+
+.hypernovum-tooltip .tooltip-stack-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.hypernovum-tooltip .tooltip-stack-item {
+  font-size: 10px;
+  font-family: var(--font-monospace, monospace);
+  color: #e0e8ff;
+  background: rgba(80, 100, 160, 0.3);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(100, 130, 200, 0.3);
+}
+
+/* Legend panel */
+.hypernovum-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 100;
+  min-width: 190px;
+  padding: 12px 14px;
+  border: 1px solid rgba(120, 150, 190, 0.25);
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.9);
+  color: rgba(230, 235, 250, 0.9);
+  font-family: var(--font-interface);
+  backdrop-filter: blur(12px);
+}
+
+.hypernovum-legend .legend-kicker {
+  margin-bottom: 10px;
+  font-family: var(--font-monospace, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(170, 190, 220, 0.6);
+}
+
+.hypernovum-legend .legend-section + .legend-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(120, 150, 190, 0.14);
+}
+
+.hypernovum-legend .legend-label {
+  margin-bottom: 7px;
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(170, 190, 220, 0.45);
+}
+
+.hypernovum-legend .legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+}
+
+.hypernovum-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: rgba(230, 235, 250, 0.82);
+}
+
+.hypernovum-legend .legend-chip {
+  background: var(--hypernovum-legend-color);
+  box-shadow: 0 0 6px var(--hypernovum-legend-glow);
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.hypernovum-legend .legend-chip.active { background: #00cc66; box-shadow: 0 0 6px rgba(0, 204, 102, 0.55); }
+.hypernovum-legend .legend-chip.blocked { background: #cc3333; box-shadow: 0 0 6px rgba(204, 51, 51, 0.55); }
+.hypernovum-legend .legend-chip.paused { background: #3366cc; box-shadow: 0 0 6px rgba(51, 102, 204, 0.55); }
+.hypernovum-legend .legend-chip.complete { background: #9966cc; box-shadow: 0 0 6px rgba(153, 102, 204, 0.55); }
+
+.hypernovum-legend .legend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 20px;
+  width: max-content;
+  padding-bottom: 1px;
+  border-bottom: 1px solid rgba(120, 150, 190, 0.25);
+}
+
+.hypernovum-legend .legend-bar {
+  width: 14px;
+  border-radius: 1px 1px 0 0;
+  background: linear-gradient(to top, rgba(140, 170, 220, 0.18), rgba(190, 215, 255, 0.55));
+}
+
+.hypernovum-legend .legend-bar.h1 { height: 4px; }
+.hypernovum-legend .legend-bar.h2 { height: 9px; }
+.hypernovum-legend .legend-bar.h3 { height: 14px; }
+.hypernovum-legend .legend-bar.h4 { height: 20px; }
+
+.hypernovum-legend .legend-range {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 9px;
+  color: rgba(170, 190, 220, 0.5);
+}
+
+.hypernovum-legend .legend-skyline .legend-range {
+  width: calc(4 * 14px + 3 * 6px);
+}
+
+.hypernovum-legend .legend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hypernovum-legend .legend-gradient {
+  background: var(--hypernovum-legend-gradient);
+  height: 8px;
+  min-width: 150px;
+  border-radius: 2px;
+}
+
+.hypernovum-legend .legend-note {
+  margin-top: 8px;
+  font-size: 9px;
+  line-height: 1.4;
+  color: rgba(170, 190, 220, 0.5);
+}
+
+.hypernovum-legend .legend-footnote {
+  margin-top: 8px;
+}
+
+/* Controls hint */
+.hypernovum-controls {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 150, 190, 0.18);
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.75);
+  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.hypernovum-controls .controls-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.hypernovum-controls kbd {
+  justify-self: start;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: inherit;
+}
+
+/* Save layout button */
+.hypernovum-save-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: linear-gradient(135deg, rgba(40, 80, 120, 0.9), rgba(30, 60, 100, 0.9));
+  border: 1px solid rgba(100, 150, 200, 0.4);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-family: var(--font-interface);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.2s ease;
+}
+
+.hypernovum-save-btn:hover {
+  background: linear-gradient(135deg, rgba(50, 100, 150, 0.95), rgba(40, 80, 130, 0.95));
+  border-color: rgba(120, 170, 220, 0.6);
+  transform: translateY(-1px);
+}
+
+.hypernovum-save-btn:active {
+  transform: translateY(0);
+}
+
+.hypernovum-snapshot-btn {
+  right: 121px;
+  background: linear-gradient(135deg, rgba(70, 40, 110, 0.9), rgba(50, 30, 85, 0.9));
+  border-color: rgba(179, 102, 255, 0.35);
+}
+
+.hypernovum-snapshot-btn:hover {
+  background: linear-gradient(135deg, rgba(90, 55, 140, 0.95), rgba(65, 40, 110, 0.95));
+  border-color: rgba(200, 140, 255, 0.55);
+}
+
+/* Building move mode indicator (bottom center — top center is occupied by the HUD title) */
+.hypernovum-move-indicator {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(200, 120, 40, 0.95), rgba(180, 100, 30, 0.95));
+  border: 1px solid rgba(255, 180, 100, 0.5);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-family: var(--font-monospace, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.95);
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 8px rgba(255, 150, 50, 0.3); }
+  50% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 16px rgba(255, 150, 50, 0.5); }
+}
+
+/* Top-left HUD stack — agents panel + activity indicator flow in a column
+   so they can never overlap each other. */
+.hypernovum-hud-topleft {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* Claude Code Activity Indicator */
+.hypernovum-activity-indicator {
+  background: linear-gradient(135deg, rgba(10, 20, 30, 0.95), rgba(5, 15, 25, 0.95));
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: var(--font-monospace, monospace);
+  min-width: 140px;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+}
+
+.hypernovum-activity-indicator.active {
+  border-color: rgba(0, 255, 255, 0.6);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.2), inset 0 0 20px rgba(0, 255, 255, 0.05);
+}
+
+.hypernovum-activity-indicator .activity-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.hypernovum-activity-indicator .activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(100, 100, 120, 0.6);
+  transition: all 0.3s ease;
+}
+
+.hypernovum-activity-indicator .activity-dot.pulsing {
+  background: #00ffff;
+  box-shadow: 0 0 8px #00ffff, 0 0 16px rgba(0, 255, 255, 0.5);
+  animation: activity-pulse 1s ease-in-out infinite;
+}
+
+@keyframes activity-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 8px #00ffff, 0 0 16px rgba(0, 255, 255, 0.5);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 12px #00ffff, 0 0 24px rgba(0, 255, 255, 0.7);
+  }
+}
+
+.hypernovum-activity-indicator .activity-text {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(150, 150, 170, 0.8);
+  transition: color 0.3s ease;
+}
+
+.hypernovum-activity-indicator.active .activity-text {
+  color: #00ffff;
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+.hypernovum-activity-indicator .activity-project {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.hypernovum-activity-indicator .activity-action {
+  font-size: 9px;
+  color: rgba(150, 180, 200, 0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* HUD Title */
+.hypernovum-hud-title {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-monospace, monospace);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: #b366ff;
+  text-shadow: 0 0 12px #b366ff, 0 0 24px rgba(179, 102, 255, 0.4);
+  background: rgba(10, 10, 20, 0.6);
+  border: 1px solid rgba(179, 102, 255, 0.2);
+  border-radius: 4px;
+  padding: 6px 18px;
+  z-index: 100;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hypernovum-cursor {
+  animation: cursor-blink 1.06s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+/* Agents Panel */
+.agents-panel {
+  font-family: var(--font-interface);
+  border-radius: 8px;
+  border: 1px solid rgba(100, 100, 140, 0.25);
+  backdrop-filter: blur(12px);
+  user-select: none;
+  background: rgba(5, 10, 20, 0.9);
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.agents-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(100, 100, 140, 0.15);
+}
+
+.agents-title {
+  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(200, 200, 220, 0.6);
+}
+
+.agents-subtitle {
+  font-family: var(--font-monospace, monospace);
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  color: rgba(150, 150, 180, 0.4);
+  margin-top: 2px;
+}
+
+.agents-list {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.agents-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s ease;
+  font-size: 12px;
+}
+
+.agents-item:hover {
+  background: rgba(100, 100, 140, 0.1);
+}
+
+.agents-item.active {
+  background: rgba(100, 100, 140, 0.15);
+  border-left-color: var(--hypernovum-agent-color);
+}
+
+.agents-icon-circle {
+  background: var(--hypernovum-agent-color);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.agents-item-name {
+  flex: 1;
+  color: rgba(220, 220, 240, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+
+/* Detected-but-absent agents stay listed so the roster is stable; they are
+   dimmed and inert rather than hidden or turned into an install prompt. */
+.agents-item.not-detected {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.agents-prepare-btn {
+  margin: 4px 8px 8px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(120, 170, 220, 0.28);
+  border-radius: 6px;
+  background: rgba(25, 45, 70, 0.72);
+  color: rgba(240, 245, 255, 0.85);
+  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+
+.agents-prepare-btn:hover:not(:disabled) {
+  border-color: rgba(140, 190, 240, 0.48);
+  background: rgba(34, 60, 92, 0.84);
+}
+
+.agents-prepare-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Vault Mode Adjustments */
+.hypernovum-container.vault-mode .agents-panel {
+  display: none;
+}
+
+/* Project command panel */
+.hypernovum-command-panel {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 170;
+  width: min(380px, calc(100% - 360px));
+  min-width: 300px;
+  padding: 10px;
+  border: 1px solid rgba(120, 150, 190, 0.25);
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.9);
+  color: rgba(230, 235, 250, 0.9);
+  font-family: var(--font-interface);
+  backdrop-filter: blur(12px);
+}
+
+.command-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.command-panel-title {
+  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(210, 225, 255, 0.65);
+}
+
+.command-panel-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  color: rgba(170, 190, 220, 0.64);
+}
+
+/* ⚠ Needs-Attention badge (TRI-002) */
+.attention-badge {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 180, 60, 0.5);
+  background: rgba(80, 55, 15, 0.5);
+  color: #ffcc66;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.attention-badge:hover { background: rgba(120, 80, 20, 0.6); }
+.attention-badge.attention-high {
+  border-color: rgba(255, 90, 90, 0.6);
+  background: rgba(80, 20, 20, 0.55);
+  color: #ff8888;
+  animation: attention-pulse 1.6s ease-in-out infinite;
+}
+@keyframes attention-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(255, 90, 90, 0); }
+  50% { box-shadow: 0 0 8px rgba(255, 90, 90, 0.6); }
+}
+
+.command-search {
+  width: 100%;
+  height: 30px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(120, 150, 190, 0.25);
+  border-radius: 6px;
+  background: rgba(12, 18, 30, 0.8);
+  color: rgba(240, 245, 255, 0.95);
+  font-size: 12px;
+}
+
+.command-row {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.command-row label {
+  font-size: 10px;
+  color: rgba(170, 190, 220, 0.64);
+  text-transform: uppercase;
+}
+
+.command-row select,
+.command-filters select {
+  min-width: 0;
+  height: 28px;
+  border: 1px solid rgba(120, 150, 190, 0.22);
+  border-radius: 6px;
+  background: rgba(12, 18, 30, 0.82);
+  color: rgba(235, 240, 255, 0.88);
+  font-size: 11px;
+}
+
+/* Lens preset row (LENS-001) */
+.preset-controls {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.preset-controls select { flex: 1; min-width: 0; }
+
+.command-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* Edge-type toggle chips (EDG-006) */
+.edge-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+}
+.edge-toggles-label {
+  font-family: var(--font-monospace, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: rgba(170, 190, 220, 0.5);
+  margin-right: 2px;
+}
+.edge-chip {
+  padding: 3px 9px;
+  border: 1px solid rgba(120, 150, 190, 0.25);
+  border-radius: 11px;
+  background: rgba(18, 26, 40, 0.6);
+  color: rgba(190, 205, 230, 0.6);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.edge-chip:hover { color: rgba(220, 232, 250, 0.9); }
+.edge-chip.active { color: #fff; }
+.edge-chip[data-edge="backlink"].active { border-color: #b38cff; background: rgba(90, 60, 140, 0.5); box-shadow: 0 0 8px rgba(179, 140, 255, 0.3); }
+.edge-chip[data-edge="depends-on"].active { border-color: #2dd4bf; background: rgba(20, 80, 72, 0.5); box-shadow: 0 0 8px rgba(45, 212, 191, 0.3); }
+.edge-chip[data-edge="blocked-by"].active { border-color: #ff8844; background: rgba(90, 50, 20, 0.5); box-shadow: 0 0 8px rgba(255, 136, 68, 0.3); }
+.edge-chip[data-edge="agent-working-on"].active { border-color: #22d3ee; background: rgba(15, 70, 85, 0.5); box-shadow: 0 0 8px rgba(34, 211, 238, 0.3); }
+
+/* Vault-mode switch (UX-001) — compact, in the command-panel header, so a
+   stray click on the panel can no longer turn the agent layer off. Scoped
+   under the header so it beats Obsidian's default button chrome. */
+.command-panel-header .vault-mode-switch {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  margin: 0;
+  padding: 0 3px 0 7px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(255, 210, 140, 0.55);
+  font-family: var(--font-monospace, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.command-panel-header .vault-mode-switch:hover {
+  border-color: rgba(255, 190, 90, 0.3);
+  color: rgba(255, 222, 170, 0.85);
+}
+
+.vault-mode-switch-track {
+  position: relative;
+  width: 24px;
+  height: 12px;
+  border: 1px solid rgba(255, 190, 90, 0.35);
+  border-radius: 6px;
+  background: rgba(45, 34, 16, 0.6);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.vault-mode-switch-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 210, 140, 0.6);
+  transition: transform 0.15s ease;
+}
+
+.command-panel-header .vault-mode-switch.active {
+  color: #ffd9a0;
+  text-shadow: 0 0 8px rgba(255, 190, 90, 0.6);
+}
+
+.vault-mode-switch.active .vault-mode-switch-track {
+  border-color: rgba(255, 190, 90, 0.75);
+  background: rgba(160, 110, 30, 0.75);
+}
+
+.vault-mode-switch.active .vault-mode-switch-thumb {
+  transform: translateX(12px);
+  background: #ffd9a0;
+}
+
+/* Project inspector */
+.hypernovum-project-inspector {
+  position: absolute;
+  top: 66px;
+  right: 16px;
+  z-index: 160;
+  width: 320px;
+  max-height: calc(100% - 140px);
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid rgba(120, 150, 190, 0.25);
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.9);
+  color: rgba(230, 235, 250, 0.9);
+  font-family: var(--font-interface);
+  backdrop-filter: blur(12px);
+}
+
+.inspector-empty {
+  font-size: 12px;
+  color: rgba(170, 190, 220, 0.58);
+}
+
+.inspector-header {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.inspector-close {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(170, 190, 220, 0.5);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.inspector-close:hover {
+  background: rgba(120, 150, 190, 0.15);
+  color: rgba(240, 245, 255, 0.9);
+}
+
+.inspector-kicker,
+.section-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-monospace, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(170, 190, 220, 0.6);
+}
+
+.inspector-header h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.inspector-grid div,
+.signal-row {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(120, 150, 190, 0.16);
+  border-radius: 6px;
+  background: rgba(18, 26, 42, 0.55);
+}
+
+.inspector-grid span,
+.signal-row span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 10px;
+  color: rgba(170, 190, 220, 0.6);
+}
+
+.inspector-grid strong,
+.signal-row strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgba(240, 245, 255, 0.94);
+}
+
+.inspector-section {
+  margin-bottom: 12px;
+}
+
+.signal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.signal-row span,
+.signal-row strong {
+  margin: 0;
+}
+
+/* Quest rows (open research questions) */
+.quest-row {
+  display: flex;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 204, 68, 0.22);
+  border-radius: 6px;
+  background: rgba(60, 45, 15, 0.35);
+  color: rgba(255, 228, 170, 0.9);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.quest-gem {
+  flex-shrink: 0;
+  color: rgba(255, 204, 68, 0.85);
+  text-shadow: 0 0 6px rgba(255, 204, 68, 0.5);
+}
+
+.hypernovum-tooltip .tooltip-quest {
+  color: #ffcc44;
+  font-weight: 600;
+}
+
+/* --- Agents section (AGT-009) --- */
+.inspector-empty-inline {
+  font-size: 11px;
+  color: rgba(180, 200, 230, 0.5);
+  padding: 4px 0;
+}
+
+.agent-row {
+  margin-top: 6px;
+  padding: 7px 9px;
+  border: 1px solid rgba(120, 200, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(20, 40, 60, 0.35);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.agent-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-row-head strong {
+  color: rgba(210, 230, 255, 0.95);
+}
+
+.agent-row-sub {
+  margin-top: 3px;
+  color: rgba(180, 200, 230, 0.7);
+}
+
+.agent-row-meta {
+  margin-top: 2px;
+  font-size: 10px;
+  color: rgba(150, 170, 200, 0.55);
+}
+
+.agent-completed {
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(120, 200, 160, 0.7);
+}
+
+/* Inspector state chips reuse the tooltip agent-state colors */
+.agent-state {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: capitalize;
+  color: rgba(255, 255, 255, 0.85);
+}
+.agent-state-editing, .agent-state-running, .agent-state-reading,
+.agent-state-testing, .agent-state-reviewing, .agent-state-planning,
+.agent-state-starting { color: #6cd0ff; }
+.agent-state-waiting { color: #ffbb44; }
+.agent-state-blocked, .agent-state-failed { color: #ff5555; }
+.agent-state-complete { color: #4ade80; }
+.agent-state-stale { color: #8a8a8a; }
+
+/* --- Attention / warning rows (TRI-003) --- */
+.warning-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.warning-row .warning-body { flex: 1; min-width: 0; }
+.warning-row .warning-proj {
+  display: block;
+  font-weight: 600;
+  color: rgba(220, 232, 250, 0.92);
+}
+.warning-row .warning-msg { color: inherit; }
+.warning-high {
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  background: rgba(60, 20, 20, 0.4);
+  color: rgba(255, 200, 200, 0.9);
+}
+.warning-medium {
+  border: 1px solid rgba(255, 180, 60, 0.3);
+  background: rgba(60, 45, 15, 0.32);
+  color: rgba(255, 225, 175, 0.88);
+}
+.warning-low {
+  border: 1px solid rgba(140, 160, 190, 0.22);
+  background: rgba(30, 40, 55, 0.3);
+  color: rgba(200, 212, 232, 0.82);
+}
+.warning-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+.warning-action {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  font-size: 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+}
+.warning-action:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* --- Dependency rows (EDG-007) --- */
+.dep-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(120, 160, 200, 0.2);
+  background: rgba(20, 32, 48, 0.4);
+  color: rgba(205, 220, 240, 0.85);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.dep-row:hover { background: rgba(35, 52, 74, 0.6); }
+.dep-row .dep-arrow { color: rgba(120, 200, 255, 0.7); flex-shrink: 0; }
+
+/* --- Trace impact (IMP-002) --- */
+.trace-section .section-label { display: flex; align-items: center; justify-content: space-between; }
+.trace-exit {
+  border: none;
+  background: transparent;
+  color: rgba(200, 215, 240, 0.6);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+.trace-exit:hover { color: #fff; }
+.trace-group { margin-top: 6px; }
+.trace-group-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(150, 175, 210, 0.6);
+  margin: 4px 0 2px;
+}
+.trace-depth {
+  flex-shrink: 0;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 8px;
+  background: rgba(120, 160, 200, 0.2);
+  color: rgba(200, 220, 245, 0.8);
+  font-size: 9px;
+}
+.trace-agent { color: #22d3ee; margin-left: auto; text-shadow: 0 0 6px #22d3ee; }
+
+/* --- Recent activity feed (TRI-005) --- */
+.activity-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.activity-row .activity-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(200, 215, 235, 0.85);
+}
+.activity-row .activity-time {
+  flex-shrink: 0;
+  color: rgba(150, 170, 200, 0.55);
+  font-size: 10px;
+}
+
+/* --- Recent commits (TRI-004) --- */
+.commit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.commit-row code {
+  flex-shrink: 0;
+  color: rgba(120, 200, 255, 0.85);
+  font-size: 10px;
+}
+.commit-row .commit-subject {
+  flex: 1;
+  color: rgba(200, 215, 235, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-row .commit-time {
+  flex-shrink: 0;
+  color: rgba(150, 170, 200, 0.55);
+  font-size: 10px;
+}
+
+/* --- Fleet summary (AGT-008) --- */
+.fleet-summary {
+  margin: 8px 0 4px;
+  font-size: 11px;
+  color: rgba(200, 220, 245, 0.8);
+  letter-spacing: 0.02em;
+}
+
+.inspector-path {
+  margin-bottom: 12px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(180, 200, 230, 0.64);
+  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
+  word-break: break-all;
+}
+
+.inspector-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.inspector-actions button {
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(120, 170, 220, 0.28);
+  border-radius: 6px;
+  background: rgba(25, 45, 70, 0.72);
+  color: rgba(240, 245, 255, 0.88);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.inspector-actions button:hover {
+  border-color: rgba(140, 190, 240, 0.48);
+  background: rgba(34, 60, 92, 0.84);
+}
+.hypernovum-container.vault-mode .hypernovum-activity-indicator {
+  display: none;
+}
+
+/* Empty state — no projects found, or filters exclude everything */
+.hypernovum-empty-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 180;
+  width: min(420px, calc(100% - 48px));
+  padding: 20px;
+  border: 1px solid rgba(120, 150, 190, 0.25);
+  border-radius: 8px;
+  background: rgba(6, 10, 18, 0.92);
+  color: rgba(230, 235, 250, 0.9);
+  font-family: var(--font-interface);
+  backdrop-filter: blur(12px);
+}
+
+.hypernovum-empty-state .empty-kicker {
+  margin-bottom: 8px;
+  font-family: var(--font-monospace, monospace);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: rgba(170, 190, 220, 0.6);
+}
+
+.hypernovum-empty-state h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.hypernovum-empty-state p {
+  margin: 0 0 12px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(190, 205, 230, 0.75);
+}
+
+.hypernovum-empty-state pre {
+  margin: 0 0 14px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 150, 190, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  font-family: var(--font-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(200, 220, 255, 0.85);
+  overflow-x: auto;
+}
+
+.hypernovum-empty-state .empty-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hypernovum-empty-state button {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid rgba(120, 170, 220, 0.28);
+  border-radius: 6px;
+  background: rgba(25, 45, 70, 0.72);
+  color: rgba(240, 245, 255, 0.88);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hypernovum-empty-state button:hover {
+  border-color: rgba(140, 190, 240, 0.48);
+  background: rgba(34, 60, 92, 0.84);
+}
+
+/* Canvas focus ring — keyboard focus only; mouse clicks stay clean */
+.hypernovum-container canvas:focus {
+  outline: none;
+}
+
+.hypernovum-container canvas:focus-visible {
+  outline: 1px solid rgba(0, 255, 255, 0.45);
+  outline-offset: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hypernovum-cursor,
+  .hypernovum-move-indicator,
+  .hypernovum-activity-indicator .activity-dot.pulsing {
+    animation: none;
+  }
+}
+
+@container hypernovum (max-width: 920px) {
+  .hypernovum-command-panel {
+    top: 58px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    min-width: 0;
+    transform: none;
+  }
+
+  .hypernovum-project-inspector {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 58px;
+    width: auto;
+    max-height: 36%;
+  }
+
+  .hypernovum-legend,
+  .hypernovum-controls,
+  .hypernovum-hud-topleft {
+    display: none;
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+   0.4 publish-readiness additions
+   --------------------------------------------------------------------------- */
+
+/* WebGL-unavailable panel (replaces a silent black canvas) */
+.hypernovum-webgl-missing {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 520px;
+  margin: 48px auto;
+  padding: 24px 28px;
+  border: 1px solid rgba(255, 90, 120, 0.35);
+  border-radius: 4px;
+  background: rgba(14, 10, 18, 0.6);
+}
+
+.hypernovum-webgl-missing h3 {
+  margin: 0;
+}
+
+.hypernovum-webgl-missing p,
+.hypernovum-webgl-missing li {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.hypernovum-webgl-missing ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* Inline "Set project folder…" action inside an inspector section */
+.inspector-inline-action {
+  margin-top: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Disabled inspector actions (no project folder resolved) */
+.inspector-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* First-run consent modal */
+.hypernovum-firstrun-list {
+  margin: 4px 0 12px;
+  padding-left: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.hypernovum-firstrun-note {
+  color: var(--text-accent);
+  font-size: 13px;
+}
+
+/* Heartbeat hooks modal */
+.hypernovum-hooks-modal h3 {
+  margin: 18px 0 4px;
+}
+
+.hypernovum-hooks-path code {
+  word-break: break-all;
+}
+
+.hypernovum-hooks-block {
+  position: relative;
+  margin: 8px 0 4px;
+}
+
+.hypernovum-hooks-block pre {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: var(--background-primary-alt);
+  font-size: 12px;
+}
+
+.hypernovum-hooks-copy {
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+.hypernovum-hooks-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Whole-vault fallback notice — only visible when no note carries the project tag */
+.hypernovum-fallback-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0 2px;
+  padding: 7px 9px;
+  border: 1px solid rgba(255, 190, 80, 0.35);
+  border-left: 3px solid rgba(255, 190, 80, 0.8);
+  border-radius: 4px;
+  background: rgba(255, 170, 40, 0.08);
+}
+.hypernovum-fallback-banner[hidden] { display: none; }
+.fallback-banner-text {
+  flex: 1;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.fallback-banner-action {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  font-size: 10px;
+  white-space: nowrap;
+  cursor: pointer;
+  color: rgba(255, 205, 120, 0.95);
+  background: rgba(255, 170, 40, 0.12);
+  border: 1px solid rgba(255, 190, 80, 0.4);
+  border-radius: 3px;
+}
+.fallback-banner-action:hover { background: rgba(255, 170, 40, 0.22); }
+.hypernovum-fallback-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin: 12px 0; }
+.hypernovum-fallback-list button { text-align: left; white-space: normal; height: auto; padding: 8px; }
+.hypernovum-container button:focus-visible, .hypernovum-container select:focus-visible, .hypernovum-container input:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 3px; }
+button.dep-row { width: 100%; height: auto; text-align: left; }
+button.agents-item { width: 100%; text-align: left; height: auto; background: transparent; box-shadow: none; }
+
+/* Debug performance overlay ("Toggle performance overlay" command) */
+.hypernovum-perf-overlay {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 210;
+  padding: 6px 10px;
+  border: 1px solid rgba(120, 220, 160, 0.3);
+  border-radius: 6px;
+  background: rgba(4, 10, 8, 0.82);
+  color: rgba(170, 255, 200, 0.9);
+  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* HUD collapse chevrons (HUD-001). Scoped under the container so they beat
+   Obsidian's default button chrome. */
+.hypernovum-container button.hud-collapse {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(170, 190, 220, 0.55);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hypernovum-container button.hud-collapse:hover {
+  background: rgba(120, 150, 190, 0.15);
+  color: rgba(240, 245, 255, 0.9);
+}
+
+.agents-panel.is-collapsed .agents-list,
+.agents-panel.is-collapsed .agents-prepare-btn,
+.agents-panel.is-collapsed .agents-subtitle {
+  display: none;
+}
+
+.agents-panel.is-collapsed .agents-header {
+  border-bottom: none;
+}
+
+.hypernovum-command-panel.is-collapsed > :not(.command-panel-header) {
+  display: none;
+}
+
+.hypernovum-command-panel.is-collapsed .command-panel-header {
+  margin-bottom: 0;
+}
+
+.hypernovum-project-inspector > .inspector-collapse {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+/* Keep the project view's close button clear of the collapse chevron. */
+.hypernovum-project-inspector .inspector-close {
+  right: 18px;
+}
+
+.hypernovum-project-inspector.is-collapsed {
+  overflow: hidden;
+}
+
+.hypernovum-project-inspector.is-collapsed .inspector-body > :not(.inspector-header) {
+  display: none;
+}
+
+.hypernovum-project-inspector.is-collapsed .inspector-header {
+  margin-bottom: 0;
+}
+
+/* Hide HUD (H / "Toggle HUD"): only the title and the legend stay. */
+.hypernovum-container.hud-hidden .hypernovum-hud-topleft,
+.hypernovum-container.hud-hidden .hypernovum-command-panel,
+.hypernovum-container.hud-hidden .hypernovum-project-inspector,
+.hypernovum-container.hud-hidden .hypernovum-controls,
+.hypernovum-container.hud-hidden .hypernovum-save-btn {
+  display: none;
+}
