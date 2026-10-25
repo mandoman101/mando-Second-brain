@@ -853,7 +853,12 @@ class ForgePointsAdapter:
                     state = "running"
                 else:
                     state = "reading"
-                action = f"{model_lbl} | RAM {ram_used}/{ram_tot}GB | GPU {gpu}% | CPU {cpu}%"
+                ram_pct = round((ram_used / max(0.1, ram_tot)) * 100.0, 1)
+                if ram_pct >= 88.0:
+                    state = "blocked"
+                    action = f"DANGER MEMORY OVERLOAD ({ram_pct}%)! {model_lbl} | RAM {ram_used}/{ram_tot}GB — DEMOLISH SECTOR!"
+                else:
+                    action = f"{model_lbl} | RAM {ram_used}/{ram_tot}GB ({ram_pct}%) | GPU {gpu}% | CPU {cpu}%"
                 stop_flag = False
 
             cmd = [
@@ -874,6 +879,20 @@ class ForgePointsAdapter:
             snap_file = self.vault_path / ".hypernovum" / "agents" / f"{sid}.json"
             if snap_file.exists():
                 emitted.append(json.loads(snap_file.read_text(encoding="utf-8")))
+        # Mirror Projects/ and .hypernovum/agents/ into the parent repo root if it is also opened as an Obsidian vault
+        parent_obs = self.vault_path.parent / ".obsidian"
+        if parent_obs.is_dir() and self.vault_path.name == "test-vault":
+            p_plugin = parent_obs / "plugins" / "hypernovum"
+            p_plugin.mkdir(parents=True, exist_ok=True)
+            for fname in ("main.js", "manifest.json", "styles.css"):
+                sf = self.hn_path / "packages" / "obsidian-plugin" / fname
+                if sf.exists():
+                    (p_plugin / fname).write_bytes(sf.read_bytes())
+            (parent_obs / "community-plugins.json").write_text(json.dumps(["hypernovum"], indent=2) + "\n", encoding="utf-8")
+            p_agents = self.vault_path.parent / ".hypernovum" / "agents"
+            p_agents.mkdir(parents=True, exist_ok=True)
+            for jf in (self.vault_path / ".hypernovum" / "agents").glob("*.json"):
+                (p_agents / jf.name).write_bytes(jf.read_bytes())
         return emitted
 
     def install_hypernovum_plugin_into_vault(self) -> Dict[str, Any]:

@@ -66,7 +66,7 @@
       "priority": "high",
       "stage": "active",
       "category": "mobile-apps",
-      "projectDir": "/Users/mandoman/Development/AndroidStudioProjects/kaysNails",
+      "projectDir": "/Users/millie-girl/.openclaw/workspace/android-studio-mcp",
       "stack": [
         "Flutter",
         "Dart",
@@ -112,7 +112,7 @@
     {
       "nodeId": "m3-max-mbp",
       "sessionId": "agent-architect-m3max",
-      "agentName": "Architect (mando-mbp M3 Max 64GB)",
+      "agentName": "\u2696\ufe0f Orb of Judgment: Architect (M3 Max 64GB)",
       "agentType": "claude",
       "targetProjectTitle": "ForgePoints AI Lab Collective Intelligence",
       "targetProjectDir": "/Users/millie-girl/development/forgepoints-ai-lab",
@@ -121,16 +121,16 @@
     {
       "nodeId": "ty-bot",
       "sessionId": "agent-analyst-tybot",
-      "agentName": "Analyst (ty-bot M4 32GB)",
+      "agentName": "\u2696\ufe0f Orb of Judgment: Analyst (ty-bot 32GB)",
       "agentType": "custom",
-      "targetProjectTitle": "ForgePoints AI Lab Collective Intelligence",
-      "targetProjectDir": "/Users/millie-girl/development/forgepoints-ai-lab",
+      "targetProjectTitle": "kaysNails Flutter App",
+      "targetProjectDir": "/Users/millie-girl/.openclaw/workspace/android-studio-mcp",
       "role": "Live API Researcher & Deep Repo Analyst"
     },
     {
       "nodeId": "mando-bot",
       "sessionId": "agent-coder-mandobot",
-      "agentName": "Coder (mando-bot M4 Pro 24GB)",
+      "agentName": "\u2696\ufe0f Orb of Judgment: Coder (mando-bot 24GB)",
       "agentType": "codex",
       "targetProjectTitle": "ForgePoint AI Memory Monitor",
       "targetProjectDir": "/Users/millie-girl/development/macOS App/forge Point AI memory monitor",
@@ -139,10 +139,10 @@
     {
       "nodeId": "millie-girl",
       "sessionId": "agent-controller-milliegirl",
-      "agentName": "Controller (millie-girl M4 16GB)",
+      "agentName": "\u2696\ufe0f Orb of Judgment: Controller (millie-girl 16GB)",
       "agentType": "custom",
-      "targetProjectTitle": "ForgePoint AI Memory Monitor",
-      "targetProjectDir": "/Users/millie-girl/development/macOS App/forge Point AI memory monitor",
+      "targetProjectTitle": "Creality 3D Printer Klipper Node",
+      "targetProjectDir": "/Users/millie-girl/.openclaw/workspace",
       "role": "OpenClaw Gateway & Second-Brain Vault Host"
     }
   ]
