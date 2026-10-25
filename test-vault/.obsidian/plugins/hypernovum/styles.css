@@ -1650,3 +1650,59 @@ button.agents-item { width: 100%; text-align: left; height: auto; background: tr
 .hypernovum-container.hud-hidden .hypernovum-save-btn {
   display: none;
 }
+
+
+/* === FORGEPOINTS NEON CYBERPUNK CONTEXT MENU BADGES === */
+.menu-item.fp-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 0.16s ease, box-shadow 0.16s ease;
+}
+.menu-item.fp-menu-item:hover {
+  background: rgba(0, 242, 254, 0.14) !important;
+  box-shadow: inset 0 0 12px rgba(0, 242, 254, 0.18);
+}
+.fp-menu-badge {
+  display: inline-block;
+  font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  margin-right: 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.fp-badge-cyan-badge {
+  background: rgba(0, 242, 254, 0.18);
+  border: 1px solid #00f2fe;
+  color: #00f2fe;
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.35);
+}
+.fp-badge-gold-badge {
+  background: rgba(255, 209, 102, 0.18);
+  border: 1px solid #ffd166;
+  color: #ffd166;
+  box-shadow: 0 0 8px rgba(255, 209, 102, 0.35);
+}
+.fp-badge-purple-badge {
+  background: rgba(189, 0, 255, 0.18);
+  border: 1px solid #d580ff;
+  color: #e5b3ff;
+  box-shadow: 0 0 8px rgba(189, 0, 255, 0.35);
+}
+.fp-badge-crimson-badge {
+  background: rgba(255, 51, 102, 0.20);
+  border: 1px solid #ff3366;
+  color: #ff668c;
+  box-shadow: 0 0 8px rgba(255, 51, 102, 0.4);
+}
+.fp-badge-emerald-badge {
+  background: rgba(0, 255, 136, 0.16);
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.35);
+}
