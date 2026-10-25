@@ -1706,3 +1706,94 @@ button.agents-item { width: 100%; text-align: left; height: auto; background: tr
   color: #00ff88;
   box-shadow: 0 0 8px rgba(0, 255, 136, 0.35);
 }
+
+
+/* === FORGEPOINTS BOTTOM COLLAPSIBLE ACTIVITY LOG DOCK === */
+.fp-activity-dock {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, calc(100% - 340px));
+  min-width: 360px;
+  max-height: 175px;
+  background: rgba(6, 14, 26, 0.86);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 242, 254, 0.36);
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.72), inset 0 0 18px rgba(0, 242, 254, 0.08);
+  display: flex;
+  flex-direction: column;
+  z-index: 25;
+  overflow: hidden;
+  font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  transition: max-height 0.24s ease;
+}
+.fp-activity-dock.collapsed {
+  max-height: 36px;
+}
+.fp-activity-dock-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 14px;
+  background: rgba(8, 22, 40, 0.92);
+  border-bottom: 1px solid rgba(0, 242, 254, 0.22);
+}
+.fp-activity-dock-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #e0fbfc;
+}
+.fp-activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00f2fe;
+  box-shadow: 0 0 10px #00f2fe;
+}
+.fp-activity-toggle-btn {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 242, 254, 0.45);
+  background: rgba(0, 242, 254, 0.14);
+  color: #ffffff;
+}
+.fp-activity-toggle-btn:hover {
+  background: rgba(0, 242, 254, 0.30);
+}
+.fp-activity-dock-list {
+  padding: 8px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.fp-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: #cdebf7;
+  line-height: 1.35;
+}
+.fp-activity-time {
+  color: #8ecae6;
+  font-size: 9.5px;
+  min-width: 56px;
+}
+.fp-activity-msg {
+  color: #f4fbff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
